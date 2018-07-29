@@ -10,15 +10,15 @@ import UIKit
 
 class ViewController: UIViewController {
     
-    var button = dropDownBtn()
-
+    var button = DropDownButton()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
         
         
         //Configure the button
-        button = dropDownBtn.init(frame: CGRect(x: 0, y: 0, width: 0, height: 0))
+        button = DropDownButton.init(frame: CGRect.zero)
         button.setTitle("Colors", for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         
@@ -35,36 +35,27 @@ class ViewController: UIViewController {
         button.dropView.dropDownOptions = ["Blue", "Green", "Magenta", "White", "Black", "Pink"]
         
     }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
+    
 }
 
-protocol dropDownProtocol {
-    func dropDownPressed(string : String)
-}
-
-class dropDownBtn: UIButton, dropDownProtocol {
+class DropDownButton: UIButton {
     
-    func dropDownPressed(string: String) {
-        self.setTitle(string, for: .normal)
-        self.dismissDropDown()
-    }
-    
-    var dropView = dropDownView()
+    var dropView = DropDownView()
     
     var height = NSLayoutConstraint()
-    
     
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        self.backgroundColor = UIColor.darkGray
+        self.backgroundColor = .darkGray
         
-        dropView = dropDownView.init(frame: CGRect.init(x: 0, y: 0, width: 0, height: 0))
-        dropView.delegate = self
+        dropView = DropDownView.init(frame: CGRect.zero)
+        dropView.rowSelectedAction = { [weak self] (stringSelected) in
+            DispatchQueue.main.async {
+                self?.setTitle(stringSelected, for: .normal)
+                self?.dismissDropDown()
+            }
+        }
         dropView.translatesAutoresizingMaskIntoConstraints = false
     }
     
@@ -79,45 +70,29 @@ class dropDownBtn: UIButton, dropDownProtocol {
     
     var isOpen = false
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if isOpen == false {
-            
-            isOpen = true
-            
-            NSLayoutConstraint.deactivate([self.height])
-            
-            if self.dropView.tableView.contentSize.height > 150 {
-                self.height.constant = 150
-            } else {
-                self.height.constant = self.dropView.tableView.contentSize.height
-            }
-            
-            
-            NSLayoutConstraint.activate([self.height])
-            
-            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: .curveEaseInOut, animations: {
-                self.dropView.layoutIfNeeded()
-                self.dropView.center.y += self.dropView.frame.height / 2
-            }, completion: nil)
-            
-        } else {
-            isOpen = false
-            
-            NSLayoutConstraint.deactivate([self.height])
-            self.height.constant = 0
-            NSLayoutConstraint.activate([self.height])
-            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: .curveEaseInOut, animations: {
-                self.dropView.center.y -= self.dropView.frame.height / 2
-                self.dropView.layoutIfNeeded()
-            }, completion: nil)
-            
-        }
+        isOpen ? dismissDropDown() : openDropDown()
     }
     
-    func dismissDropDown() {
+    fileprivate func openDropDown() {
+        isOpen = true
+        self.height.isActive = false
+        
+        let tableViewHeight = self.dropView.tableView.contentSize.height
+        self.height.constant = (tableViewHeight > 150) ? 150 : tableViewHeight
+        self.height.isActive = true
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: .curveEaseInOut, animations: {
+            self.dropView.layoutIfNeeded()
+            self.dropView.center.y += self.dropView.frame.height / 2
+        }, completion: nil)
+    }
+    
+    fileprivate func dismissDropDown() {
         isOpen = false
-        NSLayoutConstraint.deactivate([self.height])
+        self.height.isActive = false
         self.height.constant = 0
-        NSLayoutConstraint.activate([self.height])
+        self.height.isActive = true
+        
         UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 0.5, options: .curveEaseInOut, animations: {
             self.dropView.center.y -= self.dropView.frame.height / 2
             self.dropView.layoutIfNeeded()
@@ -129,19 +104,19 @@ class dropDownBtn: UIButton, dropDownProtocol {
     }
 }
 
-class dropDownView: UIView, UITableViewDelegate, UITableViewDataSource  {
+class DropDownView: UIView, UITableViewDelegate, UITableViewDataSource  {
     
     var dropDownOptions = [String]()
     
     var tableView = UITableView()
     
-    var delegate : dropDownProtocol!
+    var rowSelectedAction : ((String) -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
         
-        tableView.backgroundColor = UIColor.darkGray
-        self.backgroundColor = UIColor.darkGray
+        tableView.backgroundColor = .darkGray
+        self.backgroundColor = .darkGray
         
         
         tableView.delegate = self
@@ -172,14 +147,13 @@ class dropDownView: UIView, UITableViewDelegate, UITableViewDataSource  {
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell()
-        
         cell.textLabel?.text = dropDownOptions[indexPath.row]
         cell.backgroundColor = UIColor.darkGray
         return cell
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        self.delegate.dropDownPressed(string: dropDownOptions[indexPath.row])
+        self.rowSelectedAction?(dropDownOptions[indexPath.row])
         self.tableView.deselectRow(at: indexPath, animated: true)
     }
     
